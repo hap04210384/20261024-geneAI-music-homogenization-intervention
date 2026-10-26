@@ -3,7 +3,9 @@
 Data sources: runs/d/p1_short23_results.json, runs/e/p2_results.json,
 runs/f/p3_results.json. Output: Manuscript_work/figures/F{n}.svg/.emf
 """
+import gzip
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -11,7 +13,11 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+from matplotlib.patches import (FancyBboxPatch, FancyArrowPatch, Rectangle,
+                                Ellipse, PathPatch)
+from matplotlib.lines import Line2D
+from matplotlib.path import Path as MplPath
+from matplotlib.font_manager import FontProperties
 
 WORK = Path(__file__).resolve().parents[3]          # Manuscript_work
 RUNS = WORK / "runs"
@@ -63,109 +69,426 @@ def save(fig, name):
     print("OK", emf)
 
 
-# ---------------- F1: pipeline schematic ----------------
-fig, ax = plt.subplots(figsize=(6.6, 4.36))
-ax.set_xlim(0, 100); ax.set_ylim(0, 66); ax.axis("off")
 
-def rbox(x, y, w, h, fc="#f7fafc", ec="#9db6c9", lw=0.9, rs=0.8, z=2):
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad=0.4,rounding_size={rs}",
-                                fc=fc, ec=ec, lw=lw, zorder=z))
+# ---------------- F1: study-design teaser with notated example pair ----------------
+# Layout and palette are intentionally sans-serif; F2-F5 restore the serif rcParams.
+_rc_saved = plt.rcParams.copy()
+plt.rcParams.update({
+    "font.family": "DejaVu Sans",
+    "svg.fonttype": "path",
+    "axes.edgecolor": "#9aa5b1",
+    "axes.linewidth": 0.7,
+    "font.size": 10,
+})
 
-def titled_box(x, y, w, h, title, lines, tfs=7.4, fs=6.2, tcol=C_DARK):
-    rbox(x, y, w, h)
-    ax.text(x + w / 2, y + h - 2.1, title, ha="center", va="center",
-            fontsize=tfs, fontweight="bold", color=tcol, zorder=4)
-    ax.text(x + w / 2, y + h - 4.3, "\n".join(lines), ha="center", va="top",
-            fontsize=fs, color="#1c2b3a", linespacing=1.45, zorder=4)
+SYM = FontProperties(family="Segoe UI Symbol")
 
-def result_card(x, y, w, h, tag, title, lines, ref, accent):
-    rbox(x, y, w, h)
-    from matplotlib.patches import Rectangle
-    ax.add_patch(Rectangle((x + 0.35, y + h - 4.5), w - 0.7, 4.0, fc=accent, ec=accent, zorder=3))
-    ax.text(x + 1.3, y + h - 2.5, f"{tag} \u00b7 {title}", fontsize=6.0,
-            fontweight="bold", color="white", va="center", zorder=4)
-    ax.text(x + w / 2, y + h - 6.3, "\n".join(lines), ha="center", va="top",
-            fontsize=6.2, color="#1c2b3a", linespacing=1.5, zorder=4)
-    ax.text(x + w / 2, y + 1.3, ref, ha="center", va="bottom",
-            fontsize=6.0, color="#5d6f80", zorder=4)
+NAVY   = "#1f3a5f"
+TEAL   = "#0e8a7d"
+ORANGE = "#e8862e"
+RED    = "#c0392b"
+GREY   = "#6b7684"
+LGREY  = "#e7eaee"
+INK    = "#222a33"
 
-def arrow(x1, y1, x2, y2, color=C_DARK, lw=1.1, ls="-", ms=10):
-    ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>",
-                                 mutation_scale=ms, lw=lw, color=color,
-                                 linestyle=ls, zorder=6))
+fig = plt.figure(figsize=(13.2, 7.92))
+fig.patch.set_facecolor("white")
 
-# ---------------- row 1: preparation pipeline ----------------
-titled_box(2, 53.5, 26, 10.5, "HUMAN CORPORA",
-           ["MTC-FS-INST 2.0 \u00b7 18,109 European",
-            "folk tunes (NL \u00b7 BE)",
-            "POP909 \u00b7 909 Chinese pop songs"], fs=6.0)
+# ------------------------------------------------- symmetric panel layout ----
+PX0, PW, PGAP = 0.012, 0.2275, 0.022
+XS = [PX0 + i * (PW + PGAP) for i in range(4)]
+PXEND = XS[-1] + PW
+HDY0, HDY1 = 0.915, 0.99
+YB, USTUB = 0.145, 0.075
+YLOW = 0.175
 
-ax.text(38, 64.6, "ENCODINGS \u2014 the transmission channel", ha="center",
-        fontsize=6.4, fontweight="bold", color=C_MID)
-for yy, lab in ((59.2, "a1  pitch\u2013interval"), (55.2, "a2  rhythm"), (51.2, "a3  joint")):
-    rbox(31.5, yy, 13, 3.4, fc="#eaf2f8", ec=C_MID, lw=0.9)
-    ax.text(38, yy + 1.7, lab, ha="center", va="center", fontsize=6.2, color=C_DARK, zorder=4)
+panels = [
+    dict(letter="a", title="SETUP —\none shared channel",   color=NAVY,   tint="#edf1f7"),
+    dict(letter="b", title="P1 —\ngap amplification",         color=TEAL,   tint="#e6f3f1"),
+    dict(letter="c", title="P2 —\nstructured collapse",       color=ORANGE, tint="#fdf1e3"),
+    dict(letter="d", title="P3 —\nzero-training repair",      color=RED,    tint="#fbecea"),
+]
 
-titled_box(48, 53.5, 27, 10.5, "FROZEN REFERENCE LIBRARIES",
-           ["maximal itemset mining", "strata S1 head \u00b7 S2 \u00b7 S3 tail",
-            "frozen ex ante \u2014 pre-generation", "public release + checksums (Suppl. S1)"], fs=6.0)
+for p, x0 in zip(panels, XS):
+    fig.patches.append(Rectangle((x0, HDY0), PW, HDY1 - HDY0,
+                                 fc=p["color"], ec="none",
+                                 transform=fig.transFigure, zorder=2))
+    fig.text(x0 + 0.0175, (HDY0 + HDY1) / 2, p["letter"],
+             fontsize=16, fontweight="bold", color=p["color"],
+             ha="center", va="center", transform=fig.transFigure, zorder=3,
+             bbox=dict(boxstyle="round,pad=0.32,rounding_size=0.018", fc="white", ec="none"))
+    fig.text(x0 + 0.048, (HDY0 + HDY1) / 2, p["title"],
+             fontsize=14, fontweight="bold", color="white",
+             ha="left", va="center", transform=fig.transFigure, zorder=3)
+    fig.lines.append(Line2D([x0, x0, x0 + PW, x0 + PW],
+                            [YB + USTUB, YB, YB, YB + USTUB],
+                            color="#c7cdd4", lw=1.8,
+                            solid_capstyle="round", solid_joinstyle="round",
+                            transform=fig.transFigure, zorder=1))
 
-titled_box(79, 53.5, 19, 10.5, "CONTROLS & RULES",
-           ["permutation + bootstrap CIs", "size-matched human gaps",
-            "null models N1\u2013N3", "manipulation gate (2/3)"], fs=5.9, tcol=C_RED)
+for gc in (XS[0] + PW + PGAP / 2, XS[1] + PW + PGAP / 2, XS[2] + PW + PGAP / 2):
+    fig.patches.append(FancyArrowPatch((gc - 0.0065, 0.55), (gc + 0.0065, 0.55),
+                                       arrowstyle="-|>", mutation_scale=17, lw=2.4,
+                                       color="#8b95a1", transform=fig.transFigure,
+                                       zorder=4))
 
-arrow(28.2, 58.7, 31.2, 58.7)
-arrow(44.7, 58.7, 47.7, 58.7)
-arrow(75.2, 58.7, 78.7, 58.7, color="#8a9bab", lw=0.9, ls=(0, (2, 2)))
+def mini_ax(x, y, w, h):
+    ax = fig.add_axes([x, y, w, h])
+    ax.set_facecolor("white")
+    ax.set_zorder(3)
+    for s in ("top", "right"):
+        ax.spines[s].set_visible(False)
+    ax.tick_params(labelsize=9.5, length=2.5)
+    return ax
 
-# ---------------- row 2: generation through the bottleneck ----------------
-titled_box(2, 30, 21, 17, "MACHINE CHANNEL",
-           ["Models A \u00b7 B \u00b7 C", "(three families)", "prompted per culture",
-            "inference only \u2014", "zero parameter updates"], fs=6.2)
-arrow(23.2, 38.5, 29.4, 38.5)
-ax.text(26.3, 35.4, "CN / EU prompts", ha="center", fontsize=6.0,
-        style="italic", color="#5d6f80")
+CA, CB, CC, CD = [x + PW / 2 for x in XS]
 
-from matplotlib.patches import Polygon
-ax.add_patch(Polygon([(30, 47), (50, 40), (50, 35), (30, 28)],
-                     closed=True, fc="#d7e8f5", ec=C_MID, lw=1.3, zorder=2))
-ax.text(40, 25.0, "one shared training bottleneck", ha="center", fontsize=6.8,
-        fontweight="bold", color=C_DARK)
-ax.text(40, 49.9, "variance shrinkage where the idiom is learned \u00b7 "
-                  "off-manifold drift where it is not",
-        ha="center", fontsize=6.0, style="italic", color="#5d6f80")
+# ============================================================ panel a ========
+ax = mini_ax(XS[0] + 0.014, 0.72, PW - 0.028, 0.145)
+models = ["DeepSeek", "Qwen", "GLM"]
+cn = [799, 232, 867]
+eu = [941, 505, 962]
+xp = np.arange(3)
+b1 = ax.bar(xp - 0.19, cn, 0.36, color=NAVY, label="CN prompt")
+b2 = ax.bar(xp + 0.19, eu, 0.36, color="#7fa3cc", label="EU prompt")
+for bars in (b1, b2):
+    for r in bars:
+        ax.annotate(f"{int(r.get_height())}", (r.get_x() + r.get_width() / 2, r.get_height()),
+                    ha="center", va="bottom", fontsize=10, color=INK)
+ax.set_xticks(xp); ax.set_xticklabels(models)
+ax.set_ylim(0, 2200); ax.set_yticks([])
+ax.set_ylabel("melodies", fontsize=11)
+ax.legend(fontsize=10, frameon=False, loc="upper right", handlelength=1.0)
+ax.set_title("4,306 melodies — 3 families × 2 prompts",
+             fontsize=11, color=INK, pad=4)
 
-arrow(50.3, 37.5, 53.7, 37.5)
-titled_box(54, 30, 44, 16, "CONVERGENT OUTPUT SPACE Q",
-           ["surface style survives \u2014 recognition 0.68\u20130.76",
-            "combinatorial vocabulary lost \u2014 entropy \u221243%",
-            "88% of frozen strata extinct from generated output",
-            "dist(Q, \u03c0_EU) \u2248 dist(Q, \u03c0_CN): one generic space"], fs=6.3)
+ax = mini_ax(XS[0] + 0.042, 0.435, PW - 0.084, 0.15)
+vals = [18109, 909]
+ax.barh([1, 0], vals, 0.55, color=[TEAL, ORANGE])
+ax.text(400, 1, "MTC-FS-INST · EU folk", ha="left", va="center",
+        fontsize=9.5, color="white", fontweight="bold")
+ax.text(18109 + 1500, 1, "18,109 (raw)", va="center", fontsize=10.5, color=INK)
+ax.text(909 + 400, 0, "POP909 · 909 Chinese pop songs (raw)", va="center", fontsize=10.5, color=INK)
+ax.set_xlim(0, 23800); ax.set_xticks([]); ax.set_yticks([])
+ax.set_title("Human references (frozen, pre-AI) —\nculture signal lives in the libraries",
+             fontsize=11, color=INK, pad=4, fontweight="bold")
 
-arrow(60, 53.2, 60, 46.5, color="#8a9bab", lw=0.9)
-arrow(76, 29.6, 76, 22.0)
+fig.text(CA, 0.407, "one generic output space Q —\nsame models, same prompts\nper culture, zero parameter updates",
+         fontsize=11.5, color=GREY, ha="center", va="center", style="italic")
+fig.text(CA, 0.322, "gap signature:\nsurface style survives,\nrecognition core does not",
+         fontsize=12.5, fontweight="bold", color=NAVY, ha="center", va="center")
+fig.text(CA, YLOW, "encode (a1–a3) → frozen libraries\n→ 3 nulls N0–N2 → repairs M1–M3",
+         fontsize=11, color=GREY, ha="center", va="bottom")
 
-# ---------------- row 3: the three propositions ----------------
-result_card(2, 2, 31, 19.5, "P1", "CULTURAL GAP AMPLIFICATION",
-            ["$\Delta_D = D(Q,\pi)_{out} - D(Q,\pi)_{human}$",
-             "up to +0.70 at encoding a3",
-             "(human cultural gap: 0.978)",
-             "outputs depart further from the",
-             "frozen library than human music"],
-            "Fig. 2 \u00b7 Table 2", C_DARK)
-result_card(34.5, 2, 31, 19.5, "P2", "STRUCTURED COLLAPSE",
-            ["$\u03c3(S_1) \u226b \u03c3(S_2) \u2248 \u03c3(S_3) \u2248 0$",
-             "the tail dies first \u2014 wholesale",
-             "extinction of the non-core",
-             "vocabulary, not graded loss"],
-            "Fig. 3/4 \u00b7 Table 3", C_MID)
-result_card(67, 2, 31, 19.5, "P3", "ZERO-TRAINING REPAIR",
-            ["input seeding: +0.33, dose-dependent",
-             "output filtering: +0.00",
-             "the channel is not refusing these",
-             "cultures \u2014 it is not being shown them"],
-            "Fig. 5 \u00b7 Table 5", C_RED)
-save(fig, "F1")
+# ============================================================ panel b ========
+ax = mini_ax(XS[1] + 0.014, 0.605, PW - 0.028, 0.265)
+labels = ["Human", "Qwen", "GLM", "DeepSeek"]
+gaps = [0.357, 0.447, 0.864, 1.000]
+mult = ["", "×1.3", "×2.4", "×2.8"]
+cols = ["#4d4d4d", "#7fa3cc", "#9b7fd4", "#e08585"]
+ax.bar(range(4), gaps, 0.62, color=cols)
+for i, (g, m) in enumerate(zip(gaps, mult)):
+    if m:
+        ax.text(i, g + 0.025, m, ha="center", fontsize=11,
+                fontweight="bold", color=TEAL)
+ax.axhline(0.357, ls="--", lw=1.0, color=GREY)
+ax.text(-0.44, 0.385, "human gap", fontsize=9.5, color=GREY, ha="left")
+ax.set_xticks(range(4)); ax.set_xticklabels(labels, fontsize=10.5)
+ax.set_ylim(0, 1.18); ax.set_yticks([0, 0.5, 1.0])
+ax.set_xlim(-0.55, 3.55)
+ax.set_ylabel("distributional gap  $D_{JS}$", fontsize=11)
+ax.set_title("gap amplification vs. human cultures (a2)", fontsize=11, pad=4)
+
+fig.text(CB, 0.515, "gap(Q) up to 2.8× the human gap",
+         fontsize=13, fontweight="bold", color=TEAL, ha="center")
+ax = mini_ax(XS[1] + 0.042, 0.27, PW - 0.070, 0.215)
+dv = [0.973, 0.987, 0.653, 0.789]
+cols2 = [TEAL, TEAL, "#e08585", "#e08585"]
+ax.barh(range(4), dv, 0.6, color=cols2)
+for i, v in enumerate(dv):
+    ax.text(v - 0.02, i, f"{v:.2f}", va="center", ha="right", fontsize=10, color="white")
+ax.set_yticks(range(4))
+ax.set_yticklabels(["$Q_{CN}$→$π_{CN}$", "$Q_{CN}$→$π_{EU}$",
+                    "$Q_{EU}$→$π_{EU}$", "$Q_{EU}$→$π_{CN}$"], fontsize=9.5)
+ax.set_xlim(0, 1.05); ax.set_xticks([0, 0.5, 1.0])
+ax.invert_yaxis()
+ax.set_title("outputs leave their own reference", fontsize=11, pad=4)
+fig.text(CB, YLOW, "N1 prompt-shuffle: p < 0.001\nnot sampling noise (n = 1000)",
+         fontsize=11, color=GREY, ha="center", va="bottom")
+
+# ============================================================ panel c ========
+ax = mini_ax(XS[2] + 0.014, 0.65, 0.102, 0.22)
+labels = ["human π", "DeepSeek", "GLM", "Qwen"]
+H  = [6.77, 4.86, 5.56, 6.44]
+drop = ["", "−28%", "−18%", "−5%"]
+cols3 = ["#4d4d4d", ORANGE, "#f2b05c", "#f5cf9a"]
+ax.bar(range(4), H, 0.62, color=cols3)
+for i, (h, d) in enumerate(zip(H, drop)):
+    ax.text(i, h + 0.12, d if d else "6.77 bit", ha="center", fontsize=9.5,
+            fontweight="bold", color=RED if d else GREY)
+ax.set_xticks(range(4)); ax.set_xticklabels(labels, fontsize=9, rotation=22, ha="right")
+ax.set_ylim(0, 8.2); ax.set_yticks([0, 4, 8])
+ax.set_ylabel("entropy H (bit)", fontsize=10)
+ax.set_title("entropy shrinks (a1)", fontsize=11, pad=3)
+
+ax = mini_ax(XS[2] + 0.126, 0.65, 0.102, 0.22)
+S1 = [0.90, 1.16, 2.72]; S2 = [0.00, 0.01, 0.19]; S3 = [0.00, 0.00, 0.00]
+xp = np.arange(3)
+ax.bar(xp - 0.26, S1, 0.24, color=ORANGE, label="S1 core")
+ax.bar(xp,        S2, 0.24, color="#f2b05c", label="S2 tail")
+ax.bar(xp + 0.26, S3, 0.24, color="#f5cf9a", label="S3 tip")
+ax.set_xticks(xp); ax.set_xticklabels(["DeepSeek", "GLM", "Qwen"], fontsize=9)
+ax.set_ylim(0, 3.1); ax.set_yticks([0, 1, 2, 3])
+ax.set_ylabel("mass shift σ", fontsize=10)
+ax.legend(fontsize=9, frameon=False, loc="upper left", handlelength=1.0)
+ax.set_title("strata collapse", fontsize=11, pad=3)
+
+fig.text(CC, 0.575, "the tail dies first —\nnon-core strata\ndie wholesale",
+         fontsize=12, fontweight="bold", color=RED, ha="center", va="center")
+fig.text(CC, 0.505, "strata: S1 core · S2 tail · S3 tip\n(frozen frequency strata, Suppl. §S3)\nrobust across alphabets a1–a3 & windows",
+         fontsize=11, color=GREY, ha="center", va="center")
+fig.text(CC, 0.40, "entropy deficit is structural:\nthe rare-pattern reservoir\ndisappears",
+         fontsize=11.5, color=INK, ha="center", va="center", style="italic")
+fig.text(CC, 0.325, "entropy deficit at every encoding:\np < 0.001 in all 18 cells (Table 3)",
+         fontsize=11, color=GREY, ha="center", va="center")
+fig.text(CC, YLOW, "diagnosis precedes repair —\nall claims bound to\ncounted patterns",
+         fontsize=12, fontweight="bold", color=ORANGE, ha="center", va="bottom")
+
+# ============================================================ panel d ========
+ax = mini_ax(XS[3] + 0.014, 0.545, PW - 0.028, 0.325)
+doses = [0, 0.1, 0.25, 0.5, 1.0]
+m2_ds = [0.140, 0.095, 0.094, 0.265, 0.418]
+m2_qw = [0.128, 0.094, 0.126, 0.213, 0.454]
+m2_gl = [0.107, 0.062, 0.249, 0.343, 0.293]
+m3_qw = [0.128, 0.128, 0.123, 0.117, 0.107]
+ax.plot(doses, m2_ds, "-o", ms=4, lw=2.0, color=NAVY,  label="M2 structure-seed · DeepSeek")
+ax.plot(doses, m2_qw, "-s", ms=4, lw=2.0, color=RED,   label="M2 structure-seed · Qwen")
+ax.plot(doses, m2_gl, "-^", ms=4, lw=2.0, color=TEAL,  label="M2 structure-seed · GLM")
+ax.plot(doses, m3_qw, "--v", ms=3.6, lw=1.6, color=GREY, label="M3 naive-filter · Qwen")
+ax.set_xlabel("seed dose  c", fontsize=11)
+ax.set_ylabel("pattern-faithfulness  F", fontsize=11)
+ax.set_ylim(0, 0.60); ax.set_xticks(doses)
+ax.legend(fontsize=10, frameon=False, loc="upper left", handlelength=1.4)
+ax.set_title("repair vs. filter degradation (CN)", fontsize=11, pad=4)
+
+fig.text(CD, 0.44, "gain up to +0.33\n(Qwen·CN, c = 1.0)",
+         fontsize=18, fontweight="bold", color=RED, ha="center", va="center")
+fig.text(CD, 0.35, "Kendall τ monotone up (p < 0.01)\nzero parameter updates —\nno fine-tuning, no RLHF, no prompts",
+         fontsize=11.5, color=INK, ha="center", va="center")
+fig.text(CD, 0.263, "M1 (ad-hoc injection) gains little;\nM3 (filtering) hurts —\nstructure must be re-seeded, not re-selected",
+         fontsize=10.5, color=GREY, ha="center", va="center")
+fig.text(CD, YLOW, "every +ΔF is cited to a counted\npattern cohort (Sec. 5, Table 5)",
+         fontsize=11, color=GREY, ha="center", va="bottom")
+
+# ============================================================ footer =========
+FT_Y0, FT_H = 0.016, 0.128
+fig.patches.append(Rectangle((PX0, FT_Y0), PXEND - PX0, FT_H, fc=LGREY,
+                             ec="none", transform=fig.transFigure, zorder=1))
+
+# ---------------- left zone: notated human-vs-model example ----------------
+EX0, EXW = PX0 + 0.008, 0.190          # example axes rect
+axm = fig.add_axes([EX0, 0.026, EXW, 0.118])
+axm.set_facecolor("none")
+axm.set_xlim(0, 34); axm.set_ylim(-1.1, 15.2)
+axm.set_zorder(3)
+axm.axis("off")
+for _s in axm.spines.values():
+    _s.set_visible(False)
+
+STEP_DIA = {0: 0, 2: 1, 4: 2, 5: 3, 6: 3, 7: 4, 9: 5, 11: 6}   # chroma -> diatonic step
+def dia(m):
+    return (m // 12 - 1) * 7 + STEP_DIA[m % 12]
+
+def load_human():
+    with gzip.open(WORK / "data_backup/mtc/MTC-FS-INST-2.0_sequences-1.1.jsonl.gz",
+                   "rt", encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            if rec["id"] == "NLB125823_01":
+                break
+    F = rec["features"]
+    notes = []
+    for i in range(len(F["midipitch"])):
+        if F["onsettick"][i] >= 24:      # first 2 bars (12 ticks per bar)
+            break
+        notes.append((F["midipitch"][i], F["duration"][i] * 2))   # dur in eighths
+    return notes
+
+def load_model():
+    d = json.load(open(WORK / "runs/c/gate_deepseek_EU_20261023-111519.json",
+                       encoding="utf-8"))
+    abc = [x["text"] for x in d["replies"] if x.get("i") == 7][0]
+    body = abc.split("K:G", 1)[1].replace("|]", "|")
+    STEP = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+    seq, total = [], 0.0
+    for m in re.finditer(r"([A-Ga-g])([\',]*)(\d*)(/\d+)?", body):
+        letter, acc, num, frac = m.groups()
+        midi = STEP[letter.upper()] + (60 if letter.isupper() else 72)
+        for a in acc:
+            midi += 12 if a == "'" else -12
+        if letter.upper() == "F":
+            midi += 1                                   # key of G: F sharp
+        dur = int(num) if num else 1
+        if frac:
+            dur = dur / int(frac[1:])
+        if total + dur > 12:                            # first 2 bars only
+            break
+        seq.append((midi, float(dur)))
+        total += dur
+    return seq
+
+def draw_staff(ax, notes, yb, x0, label, label_color, front_w=5.4, ew=0.72,
+               bar_e=6, total_e=12):
+    W = front_w + total_e * ew + 1.2
+    for i in range(5):
+        ax.plot([x0, x0 + W], [yb + i] * 2, color="#39424e", lw=0.9, zorder=2)
+    ax.text(x0 + 1.05, yb + 2.0, "\U0001D11E", fontproperties=SYM,
+            fontsize=17, ha="center", va="center", color="#39424e")
+    sx = x0 + 2.10
+    for dx in (0, 0.26):
+        ax.plot([sx + dx] * 2, [yb + 3.35, yb + 4.65], color="#39424e", lw=1.1)
+    for dy in (3.85, 4.35):
+        ax.plot([sx - 0.10, sx + 0.36], [yb + dy - 0.13, yb + dy + 0.13],
+                color="#39424e", lw=1.1)
+    ax.text(x0 + 3.15, yb + 2.95, "6", fontsize=11, ha="center", va="center",
+            fontweight="bold", color="#39424e")
+    ax.text(x0 + 3.15, yb + 1.05, "8", fontsize=11, ha="center", va="center",
+            fontweight="bold", color="#39424e")
+    ax.text(x0, yb + 5.35, label, fontsize=7.5, ha="left", va="center",
+            fontweight="bold", color=label_color)
+
+    n = len(notes)
+    ds = [d for _, d in notes]
+    starts = [0.0] * n
+    for k in range(1, n):
+        starts[k] = starts[k - 1] + ds[k - 1]
+    xs = [x0 + front_w + (st + d / 2) * ew for (st, d) in zip(starts, ds)]
+    ys = [yb + (dia(m) - 30) / 2 for m, _ in notes]
+
+    for m in range(1, total_e // bar_e):
+        bx = x0 + front_w + m * bar_e * ew
+        ax.plot([bx, bx], [yb - 0.12, yb + 4.12], color="#39424e", lw=0.9, zorder=2)
+    xend = x0 + front_w + total_e * ew
+    ax.plot([xend, xend], [yb - 0.12, yb + 4.12], color="#39424e", lw=0.9)
+    ax.plot([xend + 0.20, xend + 0.20], [yb - 0.12, yb + 4.12], color="#39424e", lw=2.6)
+
+    stem_up = [ys[k] < yb + 2 for k in range(n)]
+    i = 0
+    while i < n:
+        if ds[i] <= 1.5:
+            j = i
+            while (j + 1 < n and ds[j + 1] <= 1.5
+                   and (starts[j + 1] % bar_e) > 1e-9):
+                j += 1
+            run = list(range(i, j + 1))
+            if len(run) >= 2:
+                up = bool(np.mean([ys[k] for k in run]) < yb + 2)
+                for k in run:
+                    stem_up[k] = up
+                tips = [(xs[k], ys[k] + (3.0 if up else -3.0)) for k in run]
+                ax.plot([tips[0][0], tips[-1][0]], [tips[0][1], tips[-1][1]],
+                        color="#222a33", lw=2.6, solid_capstyle="butt", zorder=4)
+                for k in run:
+                    if ds[k] <= 0.75:
+                        ax.plot([xs[k], xs[k] - 0.80],
+                                [ys[k] + (2.65 if up else -2.65),
+                                 ys[k] + (2.15 if up else -2.15)],
+                                color="#222a33", lw=2.0, zorder=4)
+            i = j + 1
+        else:
+            i += 1
+
+    for k in range(n):
+        x, y, d = xs[k], ys[k], ds[k]
+        up = stem_up[k]
+        xstem = x + (0.20 if up else -0.20)
+        ax.plot([xstem, xstem], [y + (0.26 if up else -0.26), y + (3.0 if up else -3.0)],
+                color="#222a33", lw=1.0, zorder=3)
+        if d <= 1.5:
+            nb = (ds[k - 1] <= 1.5) if k > 0 else False
+            na = (ds[k + 1] <= 1.5) if k + 1 < n else False
+            if not (nb or na):
+                fy = y + (3.0 if up else -3.0)
+                sgn = 1 if up else -1
+                fdir = 1 if up else -1
+                verts = [(xstem, fy),
+                         (xstem + fdir * 0.70, fy + sgn * 0.52),
+                         (xstem + fdir * 1.05, fy + sgn * 0.12),
+                         (xstem + fdir * 0.50, fy - sgn * 0.26)]
+                ax.add_patch(PathPatch(MplPath(verts, [MplPath.MOVETO, MplPath.CURVE4,
+                                                    MplPath.CURVE4, MplPath.CURVE4]),
+                                       fill=False, edgecolor="#222a33", lw=1.3, zorder=4))
+        if abs(d - 1.5) < 1e-6 or abs(d - 3) < 1e-6:
+            ax.plot([x + 0.58], [y], marker="o", ms=1.8, color="#222a33", zorder=4)
+        ax.add_patch(Ellipse((x, y), width=0.80, height=0.52, angle=-16,
+                             fc="#222a33", ec="none", zorder=5))
+    return W
+
+hn = load_human()
+mn = load_model()
+w1 = draw_staff(axm, hn, yb=7.6, x0=0.10,
+                label="human · MTC, 1884",
+                label_color=NAVY)
+w2 = draw_staff(axm, mn, yb=7.6, x0=17.0,
+                label="Model A · DeepSeek",
+                label_color=ORANGE)
+axm.text(0.10, 5.50, "human tune “Schep vreugde in het leven”:",
+         fontsize=7.2, color=INK, ha="left", va="center")
+axm.text(0.10, 3.65, "same metre, key, and dance pulse —", fontsize=7.2, style="italic",
+         color=GREY, ha="left", va="center")
+axm.text(0.10, 1.80, "0 of the tune’s 47 four-note patterns", fontsize=7.2, style="italic",
+         color=RED, ha="left", va="center", fontweight="bold")
+axm.text(0.10, 0.10, "appear in the output", fontsize=7.2, style="italic",
+         color=RED, ha="left", va="center", fontweight="bold")
+
+# ---------------- right zone: four quantitative claims ----------------
+claims = [
+    (0.030, "4,306", "generated melodies audited —\n3 families, 1 protocol, no tuning"),
+    (0.283, "2.8×", "max gap ratio vs. humans (a2);\nΔ$_D$ +0.70 at a3, p < 0.001"),
+    (0.536, "−28%", "max entropy deficit (a1·CN);\nnon-core strata σ ≈ 0, extinct"),
+    (0.789, "+0.33", "max repair gain by seeding,\ndose-dependent, zero-training"),
+]
+footer_texts = []
+for _x, big, small in claims:
+    t_big = fig.text(0, 0.076, big, fontsize=14.0, fontweight="bold", color=INK,
+                     ha="center", va="center", transform=fig.transFigure, zorder=3)
+    t_small = fig.text(0, 0.076, small, fontsize=8.0, color="#3d4754",
+                       ha="left", va="center", transform=fig.transFigure, zorder=3)
+    footer_texts.append((t_big, t_small))
+
+fig.canvas.draw()
+_rdr = fig.canvas.get_renderer()
+_BW = fig.bbox.width
+GAP_IN = 0.006
+_m = []
+for t_big, t_small in footer_texts:
+    wb = t_big.get_window_extent(renderer=_rdr).width / _BW
+    ws = t_small.get_window_extent(renderer=_rdr).width / _BW
+    _m.append((wb, ws))
+
+_start = EX0 + EXW + 0.018
+_span = (PXEND - 0.010) - _start
+_total = sum(wb + GAP_IN + ws for wb, ws in _m)
+_gap = (_span - _total) / 3
+_cur = _start
+for (t_big, t_small), (wb, ws) in zip(footer_texts, _m):
+    t_big.set_x(_cur + wb / 2)
+    t_small.set_x(_cur + wb + GAP_IN)
+    _cur += wb + GAP_IN + ws + _gap
+print("footer gap between groups: %.4f" % _gap)
+
+_f1_svg = FIGDIR / "F1.svg"
+fig.savefig(_f1_svg, format="svg", pad_inches=0)
+plt.close(fig)
+_f1_emf = FIGDIR / "F1.emf"
+_r = subprocess.run([INKSCAPE, str(_f1_svg), "--export-type=emf",
+                     f"--export-filename={_f1_emf}"],
+                    capture_output=True, text=True)
+assert _r.returncode == 0 and _f1_emf.exists(), _r.stderr[-500:]
+plt.rcParams.update(_rc_saved)
+print("OK", _f1_emf)
+
+
 
 
 # ---------------- F2: Delta_D forest plot ----------------
