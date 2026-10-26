@@ -35,6 +35,15 @@ C_DARK, C_MID, C_LIGHT = "#154360", "#2e86c1", "#85c1e9"
 C_RED, C_GRAY = "#c0392b", "#707b7c"
 C_SHADE, C_AMBER = "#fdebd0", "#9c4a08"
 
+# vivid unified palette for F2-F5 (consistent semantics across figures):
+# deep blue = primary emphasis / a3 / own-culture arm; vivid blue = main series;
+# azure/sky = lighter encodings; cyan = cross-culture dashed; purple/green =
+# secondary categories; red = human reference / control / contrast
+V_DEEP, V_BLUE, V_AZURE = "#0D47A1", "#1565C0", "#1E88E5"
+V_SKY, V_CYAN = "#64B5F6", "#4FC3F7"
+V_PURPLE, V_GREEN, V_RED = "#8E24AA", "#43A047", "#E53935"
+V_AMBER = "#B3540A"
+
 p1 = json.load(open(RUNS / "d/p1_short23_results.json", encoding="utf-8"))
 p2 = json.load(open(RUNS / "e/p2_results.json", encoding="utf-8"))
 p3 = json.load(open(RUNS / "f/p3_results.json", encoding="utf-8"))
@@ -167,30 +176,30 @@ for enc, _ in ENCS:
                      v["N2_scale_matched_human_gap"]["mean"]))
 n = len(rows)
 ypos = list(range(n - 1, -1, -1))
-enc_colors = {"a1": C_LIGHT, "a2": C_MID, "a3": C_DARK}
+enc_colors = {"a1": V_SKY, "a2": V_AZURE, "a3": V_DEEP}
 for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
     c = enc_colors[enc]
-    ax.plot([lo, hi], [y, y], color=c, lw=1.4, solid_capstyle="round")
-    ax.plot(d, y, "o", color=c, ms=5)
+    ax.plot([lo, hi], [y, y], color=c, lw=1.6, solid_capstyle="round")
+    ax.plot(d, y, "o", color=c, ms=5.5)
 # compression zone shading (Delta_D > 0) + zero line
 ax.axvspan(0, 1.38, color=C_SHADE, zorder=0)
 ax.text(0.40, n - 0.7, "compression zone ($\\Delta_D > 0$): outputs converge\ncloser to each other than same-culture human music does",
-        fontsize=6.6, color=C_AMBER, va="top", ha="left", linespacing=1.3)
-ax.axvline(0, color="#555", lw=0.8)
+        fontsize=6.6, color=V_AMBER, va="top", ha="left", linespacing=1.3)
+ax.axvline(0, color="#666", lw=0.8)
 # group separators + human-gap reference lines, group labels, per-point values
 bounds = {0: n, 1: n - 3, 2: n - 6, 3: 0}
 for gi in range(3):
     ytop = n - 3 * gi - 0.5; ybot = ytop - 3
     ref = rows[gi * 3][5]
     ax.axvline(ref, ymin=(ybot + 0.5) / (n + 1), ymax=(ytop + 0.5) / (n + 1),
-               color=C_RED, ls=(0, (4, 3)), lw=1.0)
+               color=V_RED, ls=(0, (4, 3)), lw=1.2)
     ax.text(ref, ytop - 0.45, f"human gap {ref:.3f}", fontsize=6.6,
-            color=C_RED, ha="center", va="top")
+            color=V_RED, ha="center", va="top", fontweight="bold")
     ax.text(1.335, (ytop + ybot) / 2, f"a{gi + 1}", fontsize=10,
-            fontweight="bold", color=C_DARK, ha="left", va="center")
+            fontweight="bold", color=V_DEEP, ha="left", va="center")
 for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
     ax.text(hi + 0.02, y, f"{d:+.3f}", fontsize=6.6, color=enc_colors[enc],
-            va="center", ha="left")
+            va="center", ha="left", fontweight="bold")
 for i in (3, 6):
     ax.axhline(i - 0.5, color="#bbb", lw=0.6, ls=":")
 ax.set_yticks(ypos)
@@ -206,7 +215,7 @@ save(fig, "F2")
 # ---------------- F3: survival profiles sigma(S_k) ----------------
 fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.9), sharey=True)
 strata = ["S1 (head)", "S2 (middle)", "S3 (tail)"]
-mk = {"Model A": ("o", C_DARK), "Model B": ("s", C_MID), "Model C": ("^", C_LIGHT)}
+mk = {"Model A": ("o", V_BLUE), "Model B": ("s", V_PURPLE), "Model C": ("^", V_GREEN)}
 off = {"Model A": 1.35, "Model B": 1.0, "Model C": 0.72}   # vertical label offsets
 for i, (ax, (cult, title)) in enumerate(zip(axes, [("CN", "Chinese-prompted output"),
                                                    ("EU", "European-prompted output")])):
@@ -214,29 +223,29 @@ for i, (ax, (cult, title)) in enumerate(zip(axes, [("CN", "Chinese-prompted outp
         vals = [p2["alphabets"]["a3"]["models"][key][cult]["T2_survival"][f"S{k}"]
                 for k in (1, 2, 3)]
         m, c = mk[label]
-        ax.plot(range(3), vals, marker=m, ms=5, lw=1.3, color=c, label=label)
+        ax.plot(range(3), vals, marker=m, ms=5, lw=1.5, color=c, label=label)
         for k, v in enumerate(vals):
             ax.text(k + 0.09, v * off[label], f"{v:.2g}", fontsize=5.6,
-                    color=c, va="center", ha="left")
-    ax.axhline(1.0, color=C_RED, ls=(0, (4, 3)), lw=1.0)
+                    color=c, va="center", ha="left", fontweight="bold")
+    ax.axhline(1.0, color=V_RED, ls=(0, (4, 3)), lw=1.2)
     ax.set_yscale("log")
     ax.set_xticks(range(3)); ax.set_xticklabels(strata, fontsize=8.5)
     ax.set_title(title, fontsize=9)
     ax.set_xlim(-0.3, 2.3)
     ax.grid(axis="y", color="#dddddd", lw=0.5, alpha=0.7)
     ax.text(0.03, 0.97, f"({chr(65 + i)})", transform=ax.transAxes,
-            fontsize=9.5, fontweight="bold", ha="left", va="top")
+            fontsize=9.5, fontweight="bold", color=V_DEEP, ha="left", va="top")
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
 axes[0].set_ylabel("Survival rate $\\sigma(S_k)$  (log scale)", fontsize=9)
 axes[0].text(0.03, 0.88, "non-core strata collapse below 0.1",
-             fontsize=6.6, color=C_DARK, ha="left", va="top",
+             fontsize=6.6, color=V_DEEP, ha="left", va="top",
              transform=axes[0].transAxes)
 axes[1].text(0.03, 0.88, "head amplified up to $\\times$20 — output core narrows",
-             fontsize=6.6, color=C_DARK, ha="left", va="top",
+             fontsize=6.6, color=V_DEEP, ha="left", va="top",
              transform=axes[1].transAxes)
 axes[1].text(0.97, 0.05, "dashed line: human reference $\\sigma = 1$",
-             fontsize=6.6, color=C_RED, ha="right", va="bottom",
+             fontsize=6.6, color=V_RED, ha="right", va="bottom",
              transform=axes[1].transAxes)
 axes[0].legend(fontsize=7.5, frameon=False, loc="upper right")
 save(fig, "F3")
@@ -249,19 +258,20 @@ fig, axes = plt.subplots(1, 3, figsize=(6.6, 2.1))
 for i, (ax, (a, desc)) in enumerate(zip(axes, ENCDESC4)):
     z = np.load(BDIR / f"jac.mtc.{a}.npz")
     j_in, j_out = z["j_in"], z["j_out"]
-    for vals, lab, col, ls in ((j_in, "same-variant pairs", C_DARK, "-"),
-                               (j_out, "different-family pairs", C_RED, "--")):
+    for vals, lab, col, ls in ((j_in, "same-variant pairs", V_BLUE, "-"),
+                               (j_out, "different-family pairs", V_RED, "--")):
         v = np.sort(vals)
-        ax.plot(v, np.arange(1, len(v) + 1) / len(v), ls, color=col, lw=1.1,
+        ax.plot(v, np.arange(1, len(v) + 1) / len(v), ls, color=col, lw=1.5,
                 drawstyle="steps-post", label=lab)
     rec = json.load(open(BDIR / f"mtc.{a}.json", encoding="utf-8"))
     b1, b2 = rec["b1"], rec["b2"]
     ax.grid(color="#dddddd", lw=0.5, alpha=0.7)
     ax.text(0.03, 0.97, f"({chr(65 + i)})", transform=ax.transAxes,
-            fontsize=9.5, fontweight="bold", ha="left", va="top")
+            fontsize=9.5, fontweight="bold", color=V_DEEP, ha="left", va="top")
     ax.text(0.03, 0.66, f"$\\Delta$ = {b1['contrast']:.3f}\n95% CI "
             f"[{b1['ci95'][0]:.3f}, {b1['ci95'][1]:.3f}]\nMantel r = {b2['mantel_r']:.2f}, p < .001",
-            transform=ax.transAxes, fontsize=6.5, ha="left", va="top", linespacing=1.35)
+            transform=ax.transAxes, fontsize=6.5, ha="left", va="top", linespacing=1.35,
+            color="#263238")
     ax.set_title(desc, fontsize=8.5)
     ax.set_xlim(-0.02, 0.72)
     ax.set_ylim(0, 1.02)
@@ -277,31 +287,31 @@ save(fig, "figF4_ecdf")
 
 # ---------------- F5: dose-response F(c) ----------------
 doses = p3["doses"]
-arms = [("M1_own", "M1 priming", "-", C_GRAY),
-        ("M2_own", "M2 in-context (own)", "-", C_DARK),
-        ("M2_cross", "M2 in-context (cross)", "--", C_MID),
-        ("M3_filter", "M3 rejection control", ":", C_RED)]
+arms = [("M1_own", "M1 priming", "-", V_PURPLE),
+        ("M2_own", "M2 in-context (own)", "-", V_DEEP),
+        ("M2_cross", "M2 in-context (cross)", "--", V_CYAN),
+        ("M3_filter", "M3 rejection control", ":", V_RED)]
 fig, axes = plt.subplots(2, 3, figsize=(6.8, 4.0), sharex=True)
 for j, (key, label) in enumerate(MODELS):
     for i, cult in enumerate(("CN", "EU")):
         ax = axes[i][j]
         for akey, alabel, ls, col in arms:
             s = p3["series"][f"{key}_{akey}_{cult}"]
-            ax.plot(doses, s["F"], ls, color=col, lw=1.3, marker="o", ms=3.5,
+            ax.plot(doses, s["F"], ls, color=col, lw=1.6, marker="o", ms=3.5,
                     label=alabel)
         ax.set_ylim(-0.05, 0.62)
         ax.grid(axis="y", color="#dddddd", lw=0.5, alpha=0.7)
         ax.text(0.04, 0.96, f"({chr(65 + i * 3 + j)})", transform=ax.transAxes,
-                fontsize=9, fontweight="bold", ha="left", va="top")
+                fontsize=9, fontweight="bold", color=V_DEEP, ha="left", va="top")
         own = p3["series"][f"{key}_M2_own_{cult}"]["F"]
         cross = p3["series"][f"{key}_M2_cross_{cult}"]["F"]
         gain = own[-1] - own[0]
         gap = own[-1] - cross[-1]
         ax.text(0.5, 0.97, f"own-culture gain {gain:+.2f}", transform=ax.transAxes,
-                fontsize=6.6, color=C_DARK, ha="center", va="top", fontweight="bold")
+                fontsize=6.6, color=V_DEEP, ha="center", va="top", fontweight="bold")
         if gap > 0.03:
             ax.text(0.5, 0.83, f"cross-culture seeding lags by {gap:.2f}",
-                    transform=ax.transAxes, fontsize=6.0, color=C_MID,
+                    transform=ax.transAxes, fontsize=6.0, color="#0288D1",
                     ha="center", va="top")
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
