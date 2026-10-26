@@ -35,14 +35,15 @@ C_DARK, C_MID, C_LIGHT = "#154360", "#2e86c1", "#85c1e9"
 C_RED, C_GRAY = "#c0392b", "#707b7c"
 C_SHADE, C_AMBER = "#fdebd0", "#9c4a08"
 
-# vivid unified palette for F2-F5 (consistent semantics across figures):
+# red-orange-blue palette for F2-F5 (consistent semantics across figures):
 # deep blue = primary emphasis / a3 / own-culture arm; vivid blue = main series;
-# azure/sky = lighter encodings; cyan = cross-culture dashed; purple/green =
-# secondary categories; red = human reference / control / contrast
+# azure/sky = lighter encodings / cross-culture arm; orange = secondary category
+# (a2 / Model B / M1 priming); red = human reference / control / contrast
 V_DEEP, V_BLUE, V_AZURE = "#0D47A1", "#1565C0", "#1E88E5"
-V_SKY, V_CYAN = "#64B5F6", "#4FC3F7"
-V_PURPLE, V_GREEN, V_RED = "#8E24AA", "#43A047", "#E53935"
-V_AMBER = "#B3540A"
+V_SKY = "#64B5F6"
+V_ORANGE, V_RED = "#EF6C00", "#E53935"
+V_DORANGE = "#E65100"
+V_REFGRAY = "#424242"
 
 p1 = json.load(open(RUNS / "d/p1_short23_results.json", encoding="utf-8"))
 p2 = json.load(open(RUNS / "e/p2_results.json", encoding="utf-8"))
@@ -176,7 +177,7 @@ for enc, _ in ENCS:
                      v["N2_scale_matched_human_gap"]["mean"]))
 n = len(rows)
 ypos = list(range(n - 1, -1, -1))
-enc_colors = {"a1": V_SKY, "a2": V_AZURE, "a3": V_DEEP}
+enc_colors = {"a1": V_SKY, "a2": V_ORANGE, "a3": V_DEEP}
 for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
     c = enc_colors[enc]
     ax.plot([lo, hi], [y, y], color=c, lw=1.6, solid_capstyle="round")
@@ -184,7 +185,7 @@ for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
 # compression zone shading (Delta_D > 0) + zero line
 ax.axvspan(0, 1.38, color=C_SHADE, zorder=0)
 ax.text(0.40, n - 0.7, "compression zone ($\\Delta_D > 0$): outputs converge\ncloser to each other than same-culture human music does",
-        fontsize=6.6, color=V_AMBER, va="top", ha="left", linespacing=1.3)
+        fontsize=6.6, color=V_DORANGE, va="top", ha="left", linespacing=1.3)
 ax.axvline(0, color="#666", lw=0.8)
 # group separators + human-gap reference lines, group labels, per-point values
 bounds = {0: n, 1: n - 3, 2: n - 6, 3: 0}
@@ -215,7 +216,7 @@ save(fig, "F2")
 # ---------------- F3: survival profiles sigma(S_k) ----------------
 fig, axes = plt.subplots(1, 2, figsize=(6.6, 2.9), sharey=True)
 strata = ["S1 (head)", "S2 (middle)", "S3 (tail)"]
-mk = {"Model A": ("o", V_BLUE), "Model B": ("s", V_PURPLE), "Model C": ("^", V_GREEN)}
+mk = {"Model A": ("o", V_BLUE), "Model B": ("s", V_ORANGE), "Model C": ("^", V_RED)}
 off = {"Model A": 1.35, "Model B": 1.0, "Model C": 0.72}   # vertical label offsets
 for i, (ax, (cult, title)) in enumerate(zip(axes, [("CN", "Chinese-prompted output"),
                                                    ("EU", "European-prompted output")])):
@@ -227,7 +228,7 @@ for i, (ax, (cult, title)) in enumerate(zip(axes, [("CN", "Chinese-prompted outp
         for k, v in enumerate(vals):
             ax.text(k + 0.09, v * off[label], f"{v:.2g}", fontsize=5.6,
                     color=c, va="center", ha="left", fontweight="bold")
-    ax.axhline(1.0, color=V_RED, ls=(0, (4, 3)), lw=1.2)
+    ax.axhline(1.0, color=V_REFGRAY, ls=(0, (4, 3)), lw=1.2)
     ax.set_yscale("log")
     ax.set_xticks(range(3)); ax.set_xticklabels(strata, fontsize=8.5)
     ax.set_title(title, fontsize=9)
@@ -245,7 +246,7 @@ axes[1].text(0.03, 0.88, "head amplified up to $\\times$20 — output core narro
              fontsize=6.6, color=V_DEEP, ha="left", va="top",
              transform=axes[1].transAxes)
 axes[1].text(0.97, 0.05, "dashed line: human reference $\\sigma = 1$",
-             fontsize=6.6, color=V_RED, ha="right", va="bottom",
+             fontsize=6.6, color=V_REFGRAY, ha="right", va="bottom",
              transform=axes[1].transAxes)
 axes[0].legend(fontsize=7.5, frameon=False, loc="upper right")
 save(fig, "F3")
@@ -287,9 +288,9 @@ save(fig, "figF4_ecdf")
 
 # ---------------- F5: dose-response F(c) ----------------
 doses = p3["doses"]
-arms = [("M1_own", "M1 priming", "-", V_PURPLE),
+arms = [("M1_own", "M1 priming", "-", V_ORANGE),
         ("M2_own", "M2 in-context (own)", "-", V_DEEP),
-        ("M2_cross", "M2 in-context (cross)", "--", V_CYAN),
+        ("M2_cross", "M2 in-context (cross)", "--", V_SKY),
         ("M3_filter", "M3 rejection control", ":", V_RED)]
 fig, axes = plt.subplots(2, 3, figsize=(6.8, 4.0), sharex=True)
 for j, (key, label) in enumerate(MODELS):
@@ -311,7 +312,7 @@ for j, (key, label) in enumerate(MODELS):
                 fontsize=6.6, color=V_DEEP, ha="center", va="top", fontweight="bold")
         if gap > 0.03:
             ax.text(0.5, 0.83, f"cross-culture seeding lags by {gap:.2f}",
-                    transform=ax.transAxes, fontsize=6.0, color="#0288D1",
+                    transform=ax.transAxes, fontsize=6.0, color=V_AZURE,
                     ha="center", va="top")
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
