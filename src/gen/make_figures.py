@@ -42,6 +42,7 @@ C_SHADE, C_AMBER = "#fdebd0", "#9c4a08"
 V_DEEP, V_BLUE, V_AZURE = "#0D47A1", "#1565C0", "#1E88E5"
 V_SKY = "#64B5F6"
 V_ORANGE, V_RED = "#EF6C00", "#E53935"
+V_GREEN = "#43A047"
 V_DORANGE = "#E65100"
 V_REFGRAY = "#424242"
 
@@ -289,8 +290,8 @@ save(fig, "figF4_ecdf")
 # ---------------- F5: dose-response F(c) ----------------
 doses = p3["doses"]
 arms = [("M1_own", "M1 priming", "-", V_ORANGE),
-        ("M2_own", "M2 in-context (own)", "-", V_DEEP),
-        ("M2_cross", "M2 in-context (cross)", "--", V_SKY),
+        ("M2_own", "M2 in-context (own)", "-", V_BLUE),
+        ("M2_cross", "M2 in-context (cross)", "--", V_GREEN),
         ("M3_filter", "M3 rejection control", ":", V_RED)]
 fig, axes = plt.subplots(2, 3, figsize=(6.8, 4.0), sharex=True)
 for j, (key, label) in enumerate(MODELS):
@@ -309,10 +310,10 @@ for j, (key, label) in enumerate(MODELS):
         gain = own[-1] - own[0]
         gap = own[-1] - cross[-1]
         ax.text(0.5, 0.97, f"own-culture gain {gain:+.2f}", transform=ax.transAxes,
-                fontsize=6.6, color=V_DEEP, ha="center", va="top", fontweight="bold")
+                fontsize=6.6, color=V_BLUE, ha="center", va="top", fontweight="bold")
         if gap > 0.03:
             ax.text(0.5, 0.83, f"cross-culture seeding lags by {gap:.2f}",
-                    transform=ax.transAxes, fontsize=6.0, color=V_AZURE,
+                    transform=ax.transAxes, fontsize=6.0, color=V_GREEN,
                     ha="center", va="top")
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
