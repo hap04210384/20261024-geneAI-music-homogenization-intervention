@@ -1,0 +1,71 @@
+{
+ "file": "manifests/protocol-fingerprint.json",
+ "created": "2026-10-26",
+ "purpose": "Protocol fingerprint for the generation experiments. Vendor snapshot names, API request windows, prompt templates, and decoding parameters are collected here so that the anonymous manuscript (Supplement S1.4) can refer to a single released artefact. Model anonymity in the text: A = passing both manipulation gates, B = European gate only, C = neither.",
+ "generation_protocol": {
+  "stage_c": "manipulation-check and P1/P2 base corpora (runs/c, protocol v1)",
+  "stage_f": "seeding experiment P3 (runs/f, protocol f1, 2026-10-24)",
+  "model_snapshots": {
+   "deepseek": {
+    "snapshot": "deepseek-chat",
+    "anonymised_as": "Model A"
+   },
+   "zhipu": {
+    "snapshot": "glm-4-air",
+    "anonymised_as": "Model B"
+   },
+   "dashscope": {
+    "snapshot": "qwen-flash",
+    "anonymised_as": "Model C"
+   }
+  },
+  "api_request_windows_local_time_utc8": {
+   "deepseek": {
+    "first": "2026-10-23T13:14:12+0800",
+    "last": "2026-10-24T09:17:28+0800"
+   },
+   "dashscope": {
+    "first": "2026-10-23T16:01:38+0800",
+    "last": "2026-10-24T09:39:02+0800"
+   },
+   "zhipu": {
+    "first": "2026-10-23T16:15:20+0800",
+    "last": "2026-10-24T10:05:41+0800"
+   }
+  },
+  "decoding": {
+   "temperature": 1.0,
+   "top_p": "provider default (not set by the client)",
+   "max_tokens": {
+    "stage_c": 2000,
+    "stage_f": 1200
+   },
+   "seed": "not fixed; sampling is stochastic at temperature 1.0",
+   "retries_empty": 3
+  },
+  "prompt_templates_one_per_culture_condition": {
+   "CN": {
+    "md5_utf8": "cce66648ac795a30e0297cdd6947d9ef",
+    "text": "请创作一段中国风格的单声部旋律（传统民歌或五声音阶流行风格），用 ABC 记谱法输出。严格要求：只输出 ABC 文本本身，以 X:、T:、M:、L:、K: 五行为头部；必须是单旋律线，禁止和弦、歌词、伴奏声部；长度约 12 到 16 小节；调性与拍号自选。不要输出任何解释或 Markdown 标记。"
+   },
+   "EU": {
+    "md5_utf8": "69066b4d1568f6da57f07148a669c59b",
+    "text": "Compose a single-voice melody in the style of a traditional European (e.g. Celtic, German, Balkan) folk song, written in ABC notation. Strict requirements: output ONLY the ABC text itself, starting with header lines X:, T:, M:, L:, K:; it must be a single melodic line -- no chords, no lyrics, no accompaniment staves; about 12 to 16 bars; choose any key and metre. No explanations, no Markdown fences."
+   }
+  },
+  "pieces_per_cell": {
+   "note": "100 requested per cell and dose (stage f); parsed-piece counts after ABC validation are the n reported in the manuscript tables.",
+   "stage_f": 100
+  }
+ },
+ "code_checksums_md5": {
+  "client.py": "b259157fad8f23470e8166f5c969ef35",
+  "gate.py": "a3f4862dfdbaaaa842c337f431aada89",
+  "abc_parse.py": "cafad2ad9074933d39931018787e0d8f",
+  "sample_f.py": "7c4aabd59d76b09ba6d91f732b52f6b6"
+ },
+ "reference_library_seed_md5": {
+  "CN": "5629cad1ee60a0214229964ea14f67ca",
+  "EU": "bfde73272c33bec5405794da454473d0"
+ }
+}

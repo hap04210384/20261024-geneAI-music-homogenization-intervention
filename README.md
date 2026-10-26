@@ -29,6 +29,9 @@ reference-libraries/
               libraries mined from the human corpora (the "reference genotypes")
 manifests/
   reference-libraries.md5   MD5 checksums of the six libraries above
+  protocol-fingerprint.json vendor snapshot names, API request windows, prompt
+                            templates (verbatim, with checksums), decoding parameters,
+                            and per-file code checksums for the generation stages
 docs/
   experiment_plan.md, paper_framework.md, paper_number_lineage.md,
   writing_conventions.md

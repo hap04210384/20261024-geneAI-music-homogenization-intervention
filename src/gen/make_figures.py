@@ -174,18 +174,18 @@ for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
     ax.plot(d, y, "o", color=c, ms=5)
 # amplification zone shading + zero line
 ax.axvspan(0, 1.38, color=C_SHADE, zorder=0)
-ax.text(0.40, n - 0.7, "amplification zone ($\\Delta_D > 0$): output departs\nfurther from the frozen culture-specific library\nthan same-culture human music does",
+ax.text(0.40, n - 0.7, "compression zone ($\\Delta_D > 0$): outputs converge\ncloser to each other than same-culture human music does",
         fontsize=6.6, color=C_AMBER, va="top", ha="left", linespacing=1.3)
 ax.axvline(0, color="#555", lw=0.8)
 # group separators + human-gap reference lines, group labels, per-point values
 bounds = {0: n, 1: n - 3, 2: n - 6, 3: 0}
 for gi in range(3):
-    ytop = n - 3 * gi - 0.5; ybot = n - 3 * (gi + 1) + 0.5
+    ytop = n - 3 * gi - 0.5; ybot = ytop - 3
     ref = rows[gi * 3][5]
     ax.axvline(ref, ymin=(ybot + 0.5) / (n + 1), ymax=(ytop + 0.5) / (n + 1),
                color=C_RED, ls=(0, (4, 3)), lw=1.0)
-    ax.text(ref, ytop + 0.55, f"human gap {ref:.3f}", fontsize=6.6,
-            color=C_RED, ha="center", va="bottom")
+    ax.text(ref, ytop - 0.45, f"human gap {ref:.3f}", fontsize=6.6,
+            color=C_RED, ha="center", va="top")
     ax.text(1.335, (ytop + ybot) / 2, f"a{gi + 1}", fontsize=10,
             fontweight="bold", color=C_DARK, ha="left", va="center")
 for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
@@ -195,7 +195,7 @@ for i in (3, 6):
     ax.axhline(i - 0.5, color="#bbb", lw=0.6, ls=":")
 ax.set_yticks(ypos)
 ax.set_yticklabels([f"{lab} \u00b7 {enc}" for enc, lab, *_ in rows], fontsize=8)
-ax.set_xlabel("Amplified cultural gap  $\\Delta_D$  (95% bootstrap CI; point labels show $\\Delta_D$)", fontsize=9)
+ax.set_xlabel("Cultural-gap compression  $\\Delta_D$  (95% bootstrap CI; point labels show $\\Delta_D$)", fontsize=9)
 ax.set_xlim(-0.45, 1.38)
 ax.set_ylim(-0.6, n + 0.6)
 for spine in ("top", "right", "left"):
