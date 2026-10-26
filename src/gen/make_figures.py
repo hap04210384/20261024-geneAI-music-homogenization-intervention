@@ -172,7 +172,7 @@ for (enc, label, d, lo, hi, ref), y in zip(rows, ypos):
     c = enc_colors[enc]
     ax.plot([lo, hi], [y, y], color=c, lw=1.4, solid_capstyle="round")
     ax.plot(d, y, "o", color=c, ms=5)
-# amplification zone shading + zero line
+# compression zone shading (Delta_D > 0) + zero line
 ax.axvspan(0, 1.38, color=C_SHADE, zorder=0)
 ax.text(0.40, n - 0.7, "compression zone ($\\Delta_D > 0$): outputs converge\ncloser to each other than same-culture human music does",
         fontsize=6.6, color=C_AMBER, va="top", ha="left", linespacing=1.3)
