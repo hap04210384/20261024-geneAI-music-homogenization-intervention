@@ -33,8 +33,7 @@ manifests/
                             templates (verbatim, with checksums), decoding parameters,
                             and per-file code checksums for the generation stages
 docs/
-  experiment_plan.md, paper_framework.md, paper_number_lineage.md,
-  writing_conventions.md
+  paper_number_lineage.md
 ```
 
 ## 2. Corpora — download them yourself
